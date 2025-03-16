@@ -58,9 +58,10 @@ sudo apt install python3-six -y
 ```
 
 ### 4. Automate GitLab Installation via Ansible
+#### 4.1 Create Your Ansible Inventory
 - On local machine, create a folder `ansible-gitlab` and `inventory.ini`
 ```
-[gitlab_server]
+[gitlab-server]
 3.127.230.203 ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/terraform.pem ansible_python_interpreter=/usr/bin/python3
 ```
 - update ansible locally
@@ -78,8 +79,62 @@ python3 -c "import six; print(six.__version__)"
 ```
 - Check Test:
 ```bash
-ansible -i inventory.ini gitlab_server -m ping
+ansible -i inventory.ini gitlab-server -m ping
 ```
 ![image](https://github.com/user-attachments/assets/decbc83e-c378-4032-9ff8-454e8525945d)
+
+#### 4.2 Ansible Playbook: install-gitlab.yml
+```bash
+vim install-gitlab.yml
+```
+```
+- hosts: gitlab-server
+  become: yes
+  tasks:
+    - name: Install dependencies
+      apt:
+        update_cache: yes
+        name:
+          - curl
+          - ca-certificates
+          - openssh-server
+          - postfix
+        state: present
+
+    # 1) Add the GitLab GPG key via apt_key module
+    - name: Add GitLab repository GPG key
+      apt_key:
+        url: "https://packages.gitlab.com/gitlab/gitlab-ce/gpgkey"
+        state: present
+
+    # 2) Add the GitLab repository for Ubuntu 22.04 (jammy)
+    - name: Add GitLab repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://packages.gitlab.com/gitlab/gitlab-ce/ubuntu jammy main"
+        state: present
+
+    - name: Install GitLab
+      apt:
+        name: gitlab-ce
+        state: latest
+        update_cache: yes
+
+    - name: Configure external_url
+      lineinfile:
+        dest: /etc/gitlab/gitlab.rb
+        regexp: '^external_url'
+        line: "external_url 'http://{{ ansible_default_ipv4.address }}'"
+
+    - name: Reconfigure GitLab
+      command: gitlab-ctl reconfigure
+```
+
+#### 4.3 Run the Playbook
+```bash
+cd ansible-gitlab
+ansible-playbook -i inventory.ini install-gitlab.yml --list-tasks
+ansible-playbook -i inventory.ini install-gitlab.yml
+```
+- Open http://3.127.230.203 in a browser
 
 
