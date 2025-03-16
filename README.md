@@ -135,6 +135,36 @@ cd ansible-gitlab
 ansible-playbook -i inventory.ini install-gitlab.yml --list-tasks
 ansible-playbook -i inventory.ini install-gitlab.yml
 ```
+![image](https://github.com/user-attachments/assets/b83efdb9-9a9d-47f8-b614-7b082706be87)
+
 - Open http://3.127.230.203 in a browser
 
+#### 4.4 Register the GitLab Runner
+- Append tasks to install-gitlab.yml
+```
+- name: Install GitLab Runner
+  apt:
+    name: gitlab-runner
+    state: present
+    update_cache: yes
+```
+- or manually
+```bash
+sudo apt-get install -y gitlab-runner
+```
+- Registration
+In GitLab (web UI) Admin → Runners find the Registration Token.
 
+- On the server:
+```bash
+sudo gitlab-runner register \
+  --url "http://<YOUR_EC2_ELASTIC_IP>" \
+  --registration-token "<TOKEN_HERE>" \
+  --executor "shell" \
+  --description "my-shell-runner" \
+  --tag-list "shell,aws"
+```
+- Check:
+```bash
+sudo gitlab-runner status
+```
