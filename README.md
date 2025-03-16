@@ -169,3 +169,227 @@ sudo gitlab-runner register \
 ```bash
 sudo gitlab-runner status
 ```
+
+#### 5. Create a Terraform “Infra” Repository
+- On local machine, create a folder named infra-repo.
+```
+infra-repo/
+  ├─ .gitignore
+  ├─ .gitlab-ci.yml
+  ├─ staging/
+  │    ├─ main.tf
+  │    ├─ variables.tf
+  │    └─ outputs.tf
+  └─ production/
+       ├─ main.tf
+       ├─ variables.tf
+       └─ outputs.tf
+```
+- Initialize it as a Git repository
+- staging/main.tf
+```
+provider "aws" {
+  region = "us-east-1"  # your AWS region
+}
+
+# Simple example: create a single t2.micro instance for staging
+resource "aws_instance" "staging_server" {
+  ami           = "ami-0c55b159cbfafe1f0"  # Ubuntu 22.04 in us-east-1
+  instance_type = "t2.micro"
+
+  tags = {
+    Name = "staging-microservice"
+  }
+}
+```
+- staging/variables.tf
+```
+variable "aws_access_key" {}
+variable "aws_secret_key" {}
+
+provider "aws" {
+  region     = "us-east-1"
+  access_key = var.aws_access_key
+  secret_key = var.aws_secret_key
+}
+```
+- staging/outputs.tf
+```
+output "staging_public_ip" {
+  value = aws_instance.staging_server.public_ip
+}
+```
+- .gitlab-ci.yml
+```
+stages:
+  - init
+  - validate
+  - plan
+  - apply-staging
+  - approve
+  - apply-production
+
+variables:
+  TF_ROOT: $CI_PROJECT_DIR/staging
+  TF_VAR_aws_access_key: $AWS_ACCESS_KEY_ID
+  TF_VAR_aws_secret_key: $AWS_SECRET_ACCESS_KEY
+  # Adjust region or other variables if needed
+
+init:
+  stage: init
+  script:
+    - cd $TF_ROOT
+    - terraform init
+  except:
+    - tags
+
+validate:
+  stage: validate
+  script:
+    - cd $TF_ROOT
+    - terraform validate
+  except:
+    - tags
+
+plan:
+  stage: plan
+  script:
+    - cd $TF_ROOT
+    - terraform plan -out=staging-plan.out
+  artifacts:
+    paths:
+      - staging-plan.out
+    when: always
+  except:
+    - tags
+
+apply-staging:
+  stage: apply-staging
+  script:
+    - cd $TF_ROOT
+    - terraform apply "staging-plan.out"
+  when: manual
+  only:
+    - main
+    - protected-branch
+
+approve:
+  stage: approve
+  script:
+    - echo "Waiting for manual approval for production..."
+  when: manual
+  only:
+    - main
+    - protected-branch
+
+apply-production:
+  stage: apply-production
+  script:
+    - cd production
+    - terraform init
+    - terraform plan -out=prod-plan.out
+    - terraform apply "prod-plan.out"
+  when: manual
+  only:
+    - main
+    - protected-branch
+```
+
+```bash
+git remote add origin
+http://<YOUR_EC2_ELASTIC_IP>/root/infra-repo.git
+git push -u origin main
+```
+### 5. Create the Microservice Repositories
+- inventory-repo (code from \srcs\inventory-app)
+- billing-repo (code from \srcs\billing-app)
+- gateway-repo (code from \srcs\api-gateway-app)
+#### 5.1 .gitlab-ci.yml
+```
+stages:
+  - build
+  - test
+  - scan
+  - dockerize
+  - deploy-staging
+  - approve
+  - deploy-production
+
+variables:
+  DOCKER_IMAGE: "$CI_REGISTRY_IMAGE"
+  DOCKER_TAG: "$CI_COMMIT_SHA"
+
+build:
+  stage: build
+  script:
+    - echo "Installing dependencies for build..."
+    - pip install -r requirements.txt
+  except:
+    - tags
+
+test:
+  stage: test
+  script:
+    - echo "Running Python unit tests..."
+    - python -m unittest discover
+  except:
+    - tags
+
+scan:
+  stage: scan
+  script:
+    - echo "Performing security scanning..."
+    # e.g. if using Snyk:
+    # - pip install snyk
+    # - snyk auth $SNYK_AUTH_TOKEN
+    # - snyk test --file=requirements.txt
+  except:
+    - tags
+
+dockerize:
+  stage: dockerize
+  script:
+    - echo "Building and pushing Docker image..."
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    - docker build -t $DOCKER_IMAGE:$DOCKER_TAG .
+    - docker push $DOCKER_IMAGE:$DOCKER_TAG
+  except:
+    - tags
+
+deploy-staging:
+  stage: deploy-staging
+  environment:
+    name: staging
+  script:
+    - echo "Deploying to staging environment..."
+    # Example approach: use an Ansible or Terraform step to update container
+  when: manual
+  only:
+    - main
+    - protected-branch
+
+approve:
+  stage: approve
+  script:
+    - echo "Awaiting approval to deploy to production..."
+  when: manual
+  only:
+    - main
+    - protected-branch
+
+deploy-production:
+  stage: deploy-production
+  environment:
+    name: production
+  script:
+    - echo "Deploying to production environment..."
+    # Possibly run another Terraform or Ansible script to pull the new Docker image
+  when: manual
+  only:
+    - main
+    - protected-branch
+```
+#### 5.2 Commit & Push
+
+### 6. Ansible for the Deploy Stage
+- deploy-staging.yml
