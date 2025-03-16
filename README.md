@@ -51,8 +51,35 @@ chmod 600 /home/devops/.ssh/terraform.pem
 ssh -i /home/devops/.ssh/terraform.pem ubuntu@3.127.230.203
 ```
 ![image](https://github.com/user-attachments/assets/0e2385a2-4733-420d-a708-25f2f3b80562)
-
+- Install the Six Library
+```bash
+sudo apt update
+sudo apt install python3-six -y
+```
 
 ### 4. Automate GitLab Installation via Ansible
+- On local machine, create a folder `ansible-gitlab` and `inventory.ini`
+```
+[gitlab_server]
+3.127.230.203 ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/terraform.pem ansible_python_interpreter=/usr/bin/python3
+```
+- update ansible locally
+```bash
+python3 -m venv ansible-env
+pip install --upgrade ansible
+```
+- install Six on the remote host
+```bash
+ssh -i /home/devops/.ssh/terraform.pem ubuntu@3.127.230.203
+sudo apt update
+sudo apt install python3-pip -y
+sudo pip3 install --upgrade six
+python3 -c "import six; print(six.__version__)"
+```
+- Check Test:
+```bash
+ansible -i inventory.ini gitlab_server -m ping
+```
+![image](https://github.com/user-attachments/assets/decbc83e-c378-4032-9ff8-454e8525945d)
 
 
