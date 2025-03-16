@@ -15,6 +15,13 @@
 ![image](https://github.com/user-attachments/assets/97867e4a-ae37-42f8-8146-a60285382db6)
 - AWS Key Pair for EC2: In the AWS console → EC2 → Key Pairs → Create or import a key pair.
 ![image](https://github.com/user-attachments/assets/35f11635-f4a5-4302-916d-0cae3ab99f26)
+**Important**: In the AWS console, ensure your EC2 Security Group has inbound rules for:
+
+- **SSH (22)**: from your IP address.
+- **HTTP (80)**: from 0.0.0.0/0 (or your IP range).
+- **HTTPS (443)**: optional, but recommended if you plan to secure GitLab with SSL.
+
+This ensures you can reach GitLab via a browser on port 80 or 443.
 
 ### 2. Local Environment Setup
 - we will use ubuntu/jammy64 vagrant box 
@@ -393,3 +400,13 @@ deploy-production:
 
 ### 6. Ansible for the Deploy Stage
 - deploy-staging.yml
+
+### 7. Testing Everything End-to-End
+1. **Ansible**: Re-run `ansible-playbook install-gitlab.yml --list-tasks`. No errors? Great.
+2. **GitLab UI**: Log in, create a sample project or open your microservice repos.
+3. **Terraform**: In `infra-repo`, push to `main`. See "init, validate, plan" pass. Manually "apply-staging" → AWS has new staging resources. Then "approve" + "apply-production" → production resources are created.
+4. **Microservice CI**: In, e.g., `inventory-repo`, push a code change → watch pipeline. 
+   - Build → Test → Scan → Dockerize → Deploy to Staging. 
+   - Confirm staging environment runs the new image. 
+   - Approve → Deploy to Production. 
+   - Confirm production environment is updated.
