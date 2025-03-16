@@ -136,6 +136,7 @@ ansible-playbook -i inventory.ini install-gitlab.yml --list-tasks
 ansible-playbook -i inventory.ini install-gitlab.yml
 ```
 ![image](https://github.com/user-attachments/assets/b83efdb9-9a9d-47f8-b614-7b082706be87)
+![image](https://github.com/user-attachments/assets/0b3f95c1-8c36-4973-a31d-9e43a33d026d)
 
 - Open http://3.127.230.203 in a browser
 
